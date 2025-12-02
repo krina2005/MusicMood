@@ -4,21 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>🎵 Music Mood Predictor</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v={{ range(1, 9999) | random }}">
 </head>
 <body>
   <div class="container">
-    <h1>🎶 Music Mood Predictor</h1>
-    <p class="tagline">Enter your song lyrics and let AI feel the vibe 🎧</p>
+    <div class="header-section">
+      <h1>🎶 Music Mood Predictor</h1>
+      <p class="tagline">Enter your song lyrics and let AI feel the vibe 🎧</p>
+    </div>
 
-    <!-- Lyrics Form -->
     <form id="lyricsForm" action="/predict" method="POST">
-      <textarea id="lyricsInput" name="lyrics" placeholder="Type or paste your song lyrics here...">{{ lyrics if lyrics else '' }}</textarea>
+      <div class="form-group">
+        <textarea 
+          id="lyricsInput" 
+          name="lyrics" 
+          placeholder="Type or paste your song lyrics here..." 
+          spellcheck="true"
+          required
+        ></textarea>
+      </div>
 
       <div class="button-row">
-        <button id="predictBtn" type="submit">Predict Mood</button>
-        <button type="button" id="clearBtn" class="secondary">Clear</button>
-        <button type="button" id="demoBtn" class="secondary">Demo Lyrics</button>
+        <button id="predictBtn" type="submit" class="btn-primary">Predict Mood</button>
+        <button type="button" id="clearBtn" class="btn-secondary">Clear</button>
+        <button type="button" id="demoBtn" class="btn-secondary">Demo Lyrics</button>
       </div>
     </form>
 
@@ -30,44 +39,44 @@
 
     <!-- Prediction Output -->
     {% if prediction %}
-    <div id="resultBox" class="result {{ prediction|lower }}">
+    <div class="result">
       <h2>Predicted Mood 🎧</h2>
       <p class="mood-text">{{ prediction }}</p>
       <p class="mood-desc">
         {% if prediction.lower() == "happy" %}
-          A bright and upbeat vibe — your song radiates positivity! 🌞
+          🌞 A bright and upbeat vibe — your song radiates positivity!
         {% elif prediction.lower() == "sad" %}
-          The lyrics carry emotion and depth — a heartfelt melody. 💔
+          💔 The lyrics carry emotion and depth — a heartfelt melody.
         {% elif prediction.lower() == "angry" %}
-          Intense and passionate energy — pure power in every word! 🔥
+          🔥 Intense and passionate energy — pure power in every word!
         {% elif prediction.lower() == "relaxed" %}
-          Smooth and soothing — perfect for chill vibes 🌙
+          🌙 Smooth and soothing — perfect for chill vibes
         {% else %}
-          A unique emotional blend — beautifully complex. 🎶
+          🎶 A unique emotional blend — beautifully complex.
         {% endif %}
       </p>
-      <button type="button" id="saveBtn" class="secondary">💾 Save Prediction</button>
+      <button type="button" id="saveBtn" class="btn-save">💾 Save Prediction</button>
     </div>
     {% endif %}
 
     {% if error %}
-    <div class="error">
-      <p>{{ error }}</p>
+    <div class="error-box">
+      <p>⚠️ {{ error }}</p>
     </div>
     {% endif %}
   </div>
 
   <footer>Made with 💜 by Krina</footer>
 
-  <!-- Script Section -->
   <script>
     const form = document.getElementById("lyricsForm");
     const loading = document.getElementById("loading");
     const lyricsInput = document.getElementById("lyricsInput");
     const clearBtn = document.getElementById("clearBtn");
     const demoBtn = document.getElementById("demoBtn");
-    const saveBtn = document.getElementById("saveBtn");
     const predictBtn = document.getElementById("predictBtn");
+    const resultBox = document.querySelector(".result");
+    const errorBox = document.querySelector(".error-box");
 
     const demoLyricsList = [
       "Dancing through the fire, I keep rising higher 🔥",
@@ -79,16 +88,16 @@
       "I knew I'd curse you for the longest time / Chasing shadows in the grocery line 🛒"
     ];
 
-    // Show spinner while analyzing
+    // Show loading spinner on form submit
     form.addEventListener("submit", () => {
       loading.classList.remove("hidden");
+      if (resultBox) resultBox.style.display = "none";
+      if (errorBox) errorBox.style.display = "none";
     });
 
-    // Clear lyrics and prediction
+    // Clear button functionality
     clearBtn.addEventListener("click", () => {
       lyricsInput.value = "";
-      const resultBox = document.querySelector(".result");
-      const errorBox = document.querySelector(".error");
       if (resultBox) {
         resultBox.style.opacity = "0";
         setTimeout(() => (resultBox.style.display = "none"), 300);
@@ -98,15 +107,18 @@
         setTimeout(() => (errorBox.style.display = "none"), 300);
       }
       loading.classList.add("hidden");
+      lyricsInput.focus();
     });
 
     // Demo lyrics randomizer
     demoBtn.addEventListener("click", () => {
       const random = Math.floor(Math.random() * demoLyricsList.length);
       lyricsInput.value = demoLyricsList[random];
+      lyricsInput.focus();
     });
 
-    // Save prediction to a file
+    // Save prediction to file
+    const saveBtn = document.getElementById("saveBtn");
     if (saveBtn) {
       saveBtn.addEventListener("click", () => {
         const mood = document.querySelector(".mood-text")?.innerText || "Unknown Mood";
@@ -121,18 +133,21 @@
 
     // Hide prediction when typing new lyrics
     lyricsInput.addEventListener("input", () => {
-      const resultBox = document.querySelector(".result");
       if (resultBox) {
         resultBox.style.opacity = "0";
         setTimeout(() => (resultBox.style.display = "none"), 300);
+      }
+      if (errorBox) {
+        errorBox.style.opacity = "0";
+        setTimeout(() => (errorBox.style.display = "none"), 300);
       }
     });
 
     // Scroll result into view automatically
     window.addEventListener("load", () => {
-      const resultBox = document.getElementById("resultBox");
+      const resultBox = document.querySelector(".result");
       if (resultBox) {
-        resultBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => resultBox.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
       }
     });
 
@@ -144,7 +159,7 @@
       }
     });
 
-    // 🔥 Arrow keys behave like Tab / Shift+Tab navigation
+    // Arrow keys navigation
     const focusableElements = Array.from(document.querySelectorAll("textarea, button"));
     let currentIndex = 0;
 
@@ -157,16 +172,15 @@
         e.preventDefault();
         currentIndex = (currentIndex - 1 + focusableElements.length) % focusableElements.length;
         focusableElements[currentIndex].focus();
-      } else if (e.key === "Enter" && document.activeElement.tagName === "BUTTON") {
-        document.activeElement.click();
       }
     });
 
-    // Add focus styling
-    focusableElements.forEach(el => {
+    // Focus styling
+    focusableElements.forEach((el, idx) => {
       el.addEventListener("focus", () => {
         focusableElements.forEach(f => f.classList.remove("focused"));
         el.classList.add("focused");
+        currentIndex = idx;
       });
     });
   </script>
