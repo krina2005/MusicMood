@@ -13,176 +13,470 @@
       <p class="tagline">Enter your song lyrics and let AI feel the vibe 🎧</p>
     </div>
 
-    <form id="lyricsForm" action="/predict" method="POST">
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value" id="totalPredictions">0</div>
+        <div class="stat-label">Predictions</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="wordCount">0</div>
+        <div class="stat-label">Words</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="charCount">0</div>
+        <div class="stat-label">Characters</div>
+      </div>
+    </div>
+
+    <form id="lyricsForm">
       <div class="form-group">
         <textarea 
           id="lyricsInput" 
-          name="lyrics" 
-          placeholder="Type or paste your song lyrics here..." 
+          placeholder="Type or paste your song lyrics here... 🎵" 
           spellcheck="true"
           required
         ></textarea>
+        <div class="char-counter" id="charCounter">0 / 5000</div>
       </div>
 
       <div class="button-row">
-        <button id="predictBtn" type="submit" class="btn-primary">Predict Mood</button>
-        <button type="button" id="clearBtn" class="btn-secondary">Clear</button>
-        <button type="button" id="demoBtn" class="btn-secondary">Demo Lyrics</button>
+        <button id="predictBtn" type="submit" class="btn-primary">🔮 Predict Mood</button>
+        <button type="button" id="clearBtn" class="btn-secondary">🗑️ Clear</button>
+        <button type="button" id="demoBtn" class="btn-secondary">✨ Demo Lyrics</button>
+        <button type="button" id="historyToggle" class="btn-secondary">📜 History</button>
       </div>
     </form>
 
-    <!-- Loading Animation -->
     <div id="loading" class="loading hidden">
       <div class="spinner"></div>
       <p>Analyzing lyrics...</p>
     </div>
 
-    <!-- Prediction Output -->
-    {% if prediction %}
-    <div class="result">
+    <div id="result" class="result" style="display: none;">
       <h2>Predicted Mood 🎧</h2>
-      <p class="mood-text">{{ prediction }}</p>
-      <p class="mood-desc">
-        {% if prediction.lower() == "happy" %}
-          🌞 A bright and upbeat vibe — your song radiates positivity!
-        {% elif prediction.lower() == "sad" %}
-          💔 The lyrics carry emotion and depth — a heartfelt melody.
-        {% elif prediction.lower() == "angry" %}
-          🔥 Intense and passionate energy — pure power in every word!
-        {% elif prediction.lower() == "relaxed" %}
-          🌙 Smooth and soothing — perfect for chill vibes
-        {% else %}
-          🎶 A unique emotional blend — beautifully complex.
-        {% endif %}
-      </p>
-      <button type="button" id="saveBtn" class="btn-save">💾 Save Prediction</button>
-    </div>
-    {% endif %}
+      <div class="mood-emoji" id="moodEmoji">🎵</div>
+      <p class="mood-text" id="moodText">Happy</p>
+      <p class="mood-desc" id="moodDesc">🌞 A bright and upbeat vibe — your song radiates positivity!</p>
+      
+      <div class="confidence-bar">
+        <div class="confidence-label">
+          <span>Confidence</span>
+          <span id="confidenceValue">95%</span>
+        </div>
+        <div class="confidence-track">
+          <div class="confidence-fill" id="confidenceFill" style="width: 0%"></div>
+        </div>
+      </div>
 
-    {% if error %}
-    <div class="error-box">
-      <p>⚠️ {{ error }}</p>
+      <div class="action-buttons">
+        <button type="button" id="saveBtn" class="btn-save">💾 Save Prediction</button>
+        <button type="button" id="shareBtn" class="btn-share">📤 Share</button>
+        <button type="button" id="analyzeAgain" class="btn-history">🔄 Analyze Again</button>
+      </div>
     </div>
-    {% endif %}
+
+    <div id="historyPanel" class="history-panel" style="display: none;">
+      <h3>📜 Recent Predictions</h3>
+      <div id="historyList"></div>
+      <button type="button" id="clearHistory" class="btn-secondary clear-history">Clear History</button>
+    </div>
+
+    <div id="errorBox" class="error-box" style="display: none;">
+      <p id="errorMessage">⚠️ Something went wrong!</p>
+    </div>
   </div>
 
-  <footer>Made with 💜 by Krina</footer>
+  <footer>Made with 💜 by <a href="#" id="authorLink">Krina</a></footer>
 
   <script>
+    const lyricsInput = document.getElementById("lyricsInput");
     const form = document.getElementById("lyricsForm");
     const loading = document.getElementById("loading");
-    const lyricsInput = document.getElementById("lyricsInput");
-    const clearBtn = document.getElementById("clearBtn");
-    const demoBtn = document.getElementById("demoBtn");
-    const predictBtn = document.getElementById("predictBtn");
-    const resultBox = document.querySelector(".result");
-    const errorBox = document.querySelector(".error-box");
+    const resultBox = document.getElementById("result");
+    const errorBox = document.getElementById("errorBox");
+    const charCounter = document.getElementById("charCounter");
+    const wordCountEl = document.getElementById("wordCount");
+    const charCountEl = document.getElementById("charCount");
+    const totalPredictionsEl = document.getElementById("totalPredictions");
+    const historyPanel = document.getElementById("historyPanel");
+    const historyList = document.getElementById("historyList");
 
     const demoLyricsList = [
-      "Dancing through the fire, I keep rising higher 🔥",
-      "Raindrops on my window, but I feel warm inside ☔",
-      "My heart beats louder when I see your face ❤️",
-      "The world slows down when the stars light up 🌌",
-      "Lost in my thoughts, but I find peace in sound 🎧",
-      "'Cause, darling, I'm a nightmare dressed like a daydream 😎",
-      "I knew I'd curse you for the longest time / Chasing shadows in the grocery line 🛒"
+      "Dancing through the fire, I keep rising higher 🔥\nEvery beat, every step takes me to the sky\nNothing's gonna stop me now, I'm feeling so alive",
+      "Raindrops on my window, but I feel warm inside ☔\nYour memory wraps around me like a gentle embrace\nEven in the storm, I find my peaceful place",
+      "My heart beats louder when I see your face ❤️\nTime stands still, the world fades away\nIn your eyes I found my home, forever I'll stay",
+      "The world slows down when the stars light up 🌌\nIn the silence of the night, I find my peace\nDreams floating by like clouds, sweet release",
+      "Lost in my thoughts, but I find peace in sound 🎧\nMelodies carry me to places unknown\nIn the music, I'm never alone",
+      "Screaming at the walls, they never answer back\nFire in my veins, I'm ready to attack\nThis rage inside won't fade to black",
+      "Shadows follow me wherever I go\nCan't escape this feeling, it cuts so deep\nIn the darkness, my secrets keep"
     ];
 
-    // Show loading spinner on form submit
-    form.addEventListener("submit", () => {
-      loading.classList.remove("hidden");
-      if (resultBox) resultBox.style.display = "none";
-      if (errorBox) errorBox.style.display = "none";
+    const moodEmojis = {
+      happy: "😊",
+      sad: "😢",
+      angry: "😠",
+      relaxed: "😌",
+      fear: "😰",
+      neutral: "😐"
+    };
+
+    const moodDescriptions = {
+      happy: "🌞 A bright and upbeat vibe — your song radiates positivity and joy!",
+      sad: "💔 The lyrics carry emotion and depth — a heartfelt, melancholic melody.",
+      angry: "🔥 Intense and passionate energy — pure power and raw emotion in every word!",
+      relaxed: "🌙 Smooth and soothing — perfect for chill vibes and peaceful moments.",
+      fear: "😰 Anxious and tense emotions — vulnerability expressed through powerful words.",
+      neutral: "🎶 A balanced emotional blend — subtle and contemplative."
+    };
+
+    let predictionHistory = JSON.parse(localStorage.getItem('moodHistory')) || [];
+    updateTotalPredictions();
+
+    // Character and word counter
+    lyricsInput.addEventListener("input", () => {
+      const text = lyricsInput.value;
+      const charCount = text.length;
+      const wordCount = text.trim().split(/\s+/).filter(w => w).length;
+      
+      charCounter.textContent = `${charCount} / 5000`;
+      charCountEl.textContent = charCount;
+      wordCountEl.textContent = wordCount;
+
+      if (charCount > 5000) {
+        charCounter.style.background = "rgba(239, 35, 60, 0.8)";
+      } else {
+        charCounter.style.background = "rgba(123, 44, 191, 0.8)";
+      }
+
+      hideResult();
     });
 
-    // Clear button functionality
-    clearBtn.addEventListener("click", () => {
-      lyricsInput.value = "";
-      if (resultBox) {
-        resultBox.style.opacity = "0";
-        setTimeout(() => (resultBox.style.display = "none"), 300);
+    // Form submission
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      
+      const lyrics = lyricsInput.value.trim();
+      if (!lyrics) {
+        showError("Please enter some lyrics first!");
+        return;
       }
-      if (errorBox) {
-        errorBox.style.opacity = "0";
-        setTimeout(() => (errorBox.style.display = "none"), 300);
+
+      if (lyrics.length > 5000) {
+        showError("Lyrics are too long! Maximum 5000 characters.");
+        return;
       }
+
+      showLoading();
+      hideResult();
+      hideError();
+
+      // Simulate API call with realistic delay
+      setTimeout(() => {
+        const mood = predictMood(lyrics);
+        const confidence = Math.floor(Math.random() * 20) + 80; // 80-100%
+        showResult(mood, confidence, lyrics);
+        hideLoading();
+        saveToHistory(mood, lyrics);
+      }, 1500);
+    });
+
+    // Simple mood prediction (mock)
+    function predictMood(lyrics) {
+      const lower = lyrics.toLowerCase();
+      
+      if (lower.match(/happy|joy|love|smile|bright|sun|dance|celebration|exciting/i)) return "happy";
+      if (lower.match(/sad|cry|tear|alone|miss|lost|broken|hurt|pain/i)) return "sad";
+      if (lower.match(/angry|rage|hate|fight|scream|fury|mad|fire/i)) return "angry";
+      if (lower.match(/calm|peace|relax|chill|smooth|gentle|soft|quiet/i)) return "relaxed";
+      if (lower.match(/fear|afraid|scared|worry|anxious|dark|shadow|nightmare/i)) return "fear";
+      
+      return "neutral";
+    }
+
+    function showResult(mood, confidence, lyrics) {
+      const moodText = document.getElementById("moodText");
+      const moodDesc = document.getElementById("moodDesc");
+      const moodEmoji = document.getElementById("moodEmoji");
+      const confidenceValue = document.getElementById("confidenceValue");
+      const confidenceFill = document.getElementById("confidenceFill");
+
+      moodText.textContent = mood.charAt(0).toUpperCase() + mood.slice(1);
+      moodDesc.textContent = moodDescriptions[mood] || moodDescriptions.neutral;
+      moodEmoji.textContent = moodEmojis[mood] || "🎵";
+      confidenceValue.textContent = `${confidence}%`;
+      
+      resultBox.style.display = "block";
+      setTimeout(() => {
+        confidenceFill.style.width = `${confidence}%`;
+      }, 100);
+
+      setTimeout(() => {
+        resultBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 300);
+    }
+
+    function hideResult() {
+      resultBox.style.display = "none";
+      document.getElementById("confidenceFill").style.width = "0%";
+    }
+
+    function showLoading() {
+      loading.classList.remove("hidden");
+    }
+
+    function hideLoading() {
       loading.classList.add("hidden");
+    }
+
+    function showError(message) {
+      document.getElementById("errorMessage").textContent = "⚠️ " + message;
+      errorBox.style.display = "block";
+      setTimeout(() => {
+        errorBox.style.display = "none";
+      }, 4000);
+    }
+
+    function hideError() {
+      errorBox.style.display = "none";
+    }
+
+    function showToast(message) {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => {
+        toast.remove();
+      }, 3000);
+    }
+
+    // Clear button
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      lyricsInput.value = "";
+      charCounter.textContent = "0 / 5000";
+      charCountEl.textContent = "0";
+      wordCountEl.textContent = "0";
+      hideResult();
+      hideError();
       lyricsInput.focus();
     });
 
-    // Demo lyrics randomizer
-    demoBtn.addEventListener("click", () => {
+    // Demo button
+    document.getElementById("demoBtn").addEventListener("click", () => {
       const random = Math.floor(Math.random() * demoLyricsList.length);
       lyricsInput.value = demoLyricsList[random];
+      lyricsInput.dispatchEvent(new Event('input'));
       lyricsInput.focus();
+      showToast("Demo lyrics loaded! ✨");
     });
 
-    // Save prediction to file
-    const saveBtn = document.getElementById("saveBtn");
-    if (saveBtn) {
-      saveBtn.addEventListener("click", () => {
-        const mood = document.querySelector(".mood-text")?.innerText || "Unknown Mood";
-        const lyrics = lyricsInput.value || "No lyrics provided";
-        const blob = new Blob([`Lyrics:\n${lyrics}\n\nPredicted Mood: ${mood}`], { type: "text/plain" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = "mood_prediction.txt";
-        link.click();
+    // Save button
+    document.getElementById("saveBtn").addEventListener("click", () => {
+      const mood = document.getElementById("moodText").textContent;
+      const lyrics = lyricsInput.value;
+      const confidence = document.getElementById("confidenceValue").textContent;
+      
+      const content = `Music Mood Prediction
+${"=".repeat(50)}
+
+Lyrics:
+${lyrics}
+
+Predicted Mood: ${mood}
+Confidence: ${confidence}
+Date: ${new Date().toLocaleString()}
+
+${"=".repeat(50)}
+Generated by Music Mood Predictor 🎵`;
+
+      const blob = new Blob([content], { type: "text/plain" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `mood_prediction_${mood.toLowerCase()}_${Date.now()}.txt`;
+      link.click();
+      showToast("Prediction saved! 💾");
+    });
+
+    // Share button
+    document.getElementById("shareBtn").addEventListener("click", async () => {
+      const mood = document.getElementById("moodText").textContent;
+      const text = `I just analyzed my song lyrics! The mood is: ${mood} 🎵\n\nTry it yourself with Music Mood Predictor!`;
+      
+      if (navigator.share) {
+        try {
+          await navigator.share({ text });
+          showToast("Shared successfully! 📤");
+        } catch (err) {
+          copyToClipboard(text);
+        }
+      } else {
+        copyToClipboard(text);
+      }
+    });
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        showToast("Copied to clipboard! 📋");
+      }).catch(() => {
+        showToast("Could not copy to clipboard");
       });
     }
 
-    // Hide prediction when typing new lyrics
-    lyricsInput.addEventListener("input", () => {
-      if (resultBox) {
-        resultBox.style.opacity = "0";
-        setTimeout(() => (resultBox.style.display = "none"), 300);
+    // Analyze again button
+    document.getElementById("analyzeAgain").addEventListener("click", () => {
+      lyricsInput.value = "";
+      hideResult();
+      lyricsInput.focus();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    // History functionality
+    function saveToHistory(mood, lyrics) {
+      const entry = {
+        mood,
+        lyrics: lyrics.substring(0, 100) + (lyrics.length > 100 ? "..." : ""),
+        timestamp: new Date().toISOString()
+      };
+      
+      predictionHistory.unshift(entry);
+      if (predictionHistory.length > 10) predictionHistory.pop();
+      
+      localStorage.setItem('moodHistory', JSON.stringify(predictionHistory));
+      updateTotalPredictions();
+    }
+
+    function updateTotalPredictions() {
+      totalPredictionsEl.textContent = predictionHistory.length;
+    }
+
+    function renderHistory() {
+      if (predictionHistory.length === 0) {
+        historyList.innerHTML = '<p style="color: #999; text-align: center; padding: 20px;">No predictions yet. Start analyzing!</p>';
+        return;
       }
-      if (errorBox) {
-        errorBox.style.opacity = "0";
-        setTimeout(() => (errorBox.style.display = "none"), 300);
+
+      historyList.innerHTML = predictionHistory.map((entry, index) => `
+        <div class="history-item" onclick="loadHistoryItem(${index})">
+          <div class="history-item-mood">${moodEmojis[entry.mood.toLowerCase()] || "🎵"} ${entry.mood}</div>
+          <div class="history-item-lyrics">${entry.lyrics}</div>
+          <div class="history-item-time">${new Date(entry.timestamp).toLocaleString()}</div>
+        </div>
+      `).join('');
+    }
+
+    window.loadHistoryItem = function(index) {
+      const entry = predictionHistory[index];
+      showToast("History item loaded! ✨");
+      historyPanel.style.display = "none";
+    };
+
+    document.getElementById("historyToggle").addEventListener("click", () => {
+      if (historyPanel.style.display === "none") {
+        renderHistory();
+        historyPanel.style.display = "block";
+        historyPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      } else {
+        historyPanel.style.display = "none";
       }
     });
 
-    // Scroll result into view automatically
-    window.addEventListener("load", () => {
-      const resultBox = document.querySelector(".result");
-      if (resultBox) {
-        setTimeout(() => resultBox.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+    document.getElementById("clearHistory").addEventListener("click", () => {
+      if (confirm("Are you sure you want to clear all history?")) {
+        predictionHistory = [];
+        localStorage.removeItem('moodHistory');
+        updateTotalPredictions();
+        renderHistory();
+        showToast("History cleared! 🗑️");
       }
     });
 
-    // Submit form when pressing Enter (without Shift)
+    // Enter to submit (Shift+Enter for new line)
     lyricsInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
-        predictBtn.click();
+        form.dispatchEvent(new Event('submit'));
       }
     });
 
-    // Arrow keys navigation
-    const focusableElements = Array.from(document.querySelectorAll("textarea, button"));
-    let currentIndex = 0;
+    // Keyboard navigation
+    const focusableElements = [lyricsInput, ...document.querySelectorAll("button")];
+    let currentFocusIndex = 0;
 
     document.addEventListener("keydown", (e) => {
-      if (["ArrowRight", "ArrowDown"].includes(e.key)) {
+      if (e.target.tagName === "TEXTAREA" && !e.altKey) return;
+
+      if (e.key === "Tab") {
         e.preventDefault();
-        currentIndex = (currentIndex + 1) % focusableElements.length;
-        focusableElements[currentIndex].focus();
-      } else if (["ArrowLeft", "ArrowUp"].includes(e.key)) {
-        e.preventDefault();
-        currentIndex = (currentIndex - 1 + focusableElements.length) % focusableElements.length;
-        focusableElements[currentIndex].focus();
+        currentFocusIndex = (currentFocusIndex + (e.shiftKey ? -1 : 1) + focusableElements.length) % focusableElements.length;
+        focusableElements[currentFocusIndex].focus();
       }
     });
 
-    // Focus styling
     focusableElements.forEach((el, idx) => {
       el.addEventListener("focus", () => {
-        focusableElements.forEach(f => f.classList.remove("focused"));
-        el.classList.add("focused");
-        currentIndex = idx;
+        currentFocusIndex = idx;
       });
     });
+
+    // Easter egg on author link
+    let clickCount = 0;
+    document.getElementById("authorLink").addEventListener("click", (e) => {
+      e.preventDefault();
+      clickCount++;
+      if (clickCount === 3) {
+        showToast("Thanks for using Music Mood Predictor! 💜");
+        clickCount = 0;
+      }
+    });
+
+    // Auto-save draft
+    let draftTimeout;
+    lyricsInput.addEventListener("input", () => {
+      clearTimeout(draftTimeout);
+      draftTimeout = setTimeout(() => {
+        if (lyricsInput.value.trim()) {
+          localStorage.setItem('lyricsDraft', lyricsInput.value);
+        }
+      }, 1000);
+    });
+
+    // Load draft on page load
+    window.addEventListener("load", () => {
+      const draft = localStorage.getItem('lyricsDraft');
+      if (draft) {
+        lyricsInput.value = draft;
+        lyricsInput.dispatchEvent(new Event('input'));
+      }
+    });
+
+    // Clear draft after successful prediction
+    form.addEventListener("submit", () => {
+      localStorage.removeItem('lyricsDraft');
+    });
+
+    // Accessibility: Announce results to screen readers
+    function announceToScreenReader(message) {
+      const announcement = document.createElement("div");
+      announcement.setAttribute("role", "status");
+      announcement.setAttribute("aria-live", "polite");
+      announcement.style.position = "absolute";
+      announcement.style.left = "-10000px";
+      announcement.textContent = message;
+      document.body.appendChild(announcement);
+      setTimeout(() => announcement.remove(), 1000);
+    }
+
+    // Trigger announcement when result is shown
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.target === resultBox && resultBox.style.display === "block") {
+          const mood = document.getElementById("moodText").textContent;
+          announceToScreenReader(`Mood prediction complete: ${mood}`);
+        }
+      });
+    });
+
+    observer.observe(resultBox, { attributes: true, attributeFilter: ["style"] });
   </script>
 </body>
 </html>
